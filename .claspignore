@@ -1,0 +1,19 @@
+# Git related
+.git/
+.gitignore
+
+# Documentation
+*.md
+
+# Python / Colab scripts
+**/*.py
+__pycache__/
+
+# Node / System
+node_modules/
+.DS_Store
+Thumbs.db
+
+# Configs
+clasp.json
+.vscode/
