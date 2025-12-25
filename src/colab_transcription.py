@@ -1,7 +1,7 @@
 # このスクリプトは Google Colab 上で実行することを想定しています。
 # 必要なライブラリのインストール
 # !pip install git+https://github.com/openai/whisper.git
-# !pip install gspread oauth2client
+# !pip install gspread oauth2client PyDrive
 
 import os
 import whisper

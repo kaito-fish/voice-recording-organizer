@@ -101,7 +101,7 @@ Node.js 環境にて以下を実行します。
 4.  必要なライブラリをインストールするため、以下のコマンドを別のセルで一度実行します。
     ```python
     !pip install git+https://github.com/openai/whisper.git
-    !pip install gspread oauth2client
+    !pip install gspread oauth2client PyDrive
     ```
 5.  ノートブックを実行し、Google Drive のマウント許可を与えると、文字起こし処理が開始されます。
 
