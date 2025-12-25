@@ -1,7 +1,7 @@
 # このスクリプトは Google Colab 上で実行することを想定しています。
 # 必要なライブラリのインストール
 # !pip install git+https://github.com/openai/whisper.git
-# !pip install gspread oauth2client
+# !pip install gspread oauth2client google-api-python-client
 
 import os
 import whisper
@@ -162,42 +162,29 @@ def main():
                     print(f"Error saving/updating: {e}")
 
 def run_transcription(model, file_id, file_name):
-    # Driveのマウントパスからファイルを探索するのは遅いので、
-    # IDを使って直接アクセス・ダウンロードするのがベストだが、
-    # Colab + Driveマウント環境なら、ファイルIDからパスを解決するライブラリはないため
-    # 「ファイルを検索」してパスを得るか、APIでバイナリ取得する。
-    
-    # ここでは、Drive APIを使って「content/temp.m4a」等に一時ダウンロードする方式をとる。
-    # (コードが長くなるため、擬似コードまたは簡易パス探索とする)
-    
-    # 簡易アプローチ: 
-    # Drive内をファイル名で検索 (遅い可能性があるが可読性は高い)
-    # または、ユーザーに「パス」をスプレッドシートに入れてもらう (GAS側で Url ではなく Path を入れるのはGasからだと難しい)
-    
     print(f"Transcribing {file_name}...")
-    
-    # 実際の実装簡略化のため、Drive APIでダウンロードする関数を使用想定
-    # もしくは、Driveがマウントされている前提で、subprocessでfindコマンドを使う荒技もある。
-    
-    # 今回はダウンロードスキップし、ダミー動作を防ぐため、
-    # 「ファイルIDからダウンロード」する部分を実装する。
     
     downloaded_file_path = f"/content/{file_name}"
     
-    # PyDrive または Google API Client でダウンロード
-    # !pip install PyDrive
-    from pydrive.auth import GoogleAuth
-    from pydrive.drive import GoogleDrive
-    
-    # 自動認証済みのcredsを利用
-    gauth = GoogleAuth()
-    gauth.credentials = default()[0]
-    drive_service = GoogleDrive(gauth)
+    # Google API Client を使用してダウンロード
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaIoBaseDownload
+    import io
+
+    # 既存の認証情報を使用
+    creds, _ = default()
+    drive_service = build('drive', 'v3', credentials=creds)
     
     try:
-        target_file = drive_service.CreateFile({'id': file_id})
-        target_file.GetContentFile(downloaded_file_path)
+        request = drive_service.files().get_media(fileId=file_id)
+        fh = io.FileIO(downloaded_file_path, 'wb')
+        downloader = MediaIoBaseDownload(fh, request)
         
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+            # print(f"Download {int(status.progress() * 100)}%.")
+
         # Whisper実行
         result = model.transcribe(downloaded_file_path, verbose=False, language='ja')
         
@@ -212,6 +199,8 @@ def run_transcription(model, file_id, file_name):
         
     except Exception as e:
         print(f"Transcription failed: {e}")
+        import traceback
+        traceback.print_exc()
         return None
     finally:
         if os.path.exists(downloaded_file_path):
