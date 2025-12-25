@@ -68,12 +68,12 @@ function processAudioFiles() {
  */
 function processSingleFile(file, tz) {
     try {
-        const created = file.getDateCreated();
+        const recordingDate = getRecordingDate(file);
         // 日付判定用に整形
-        const ymd = Utilities.formatDate(created, tz, 'yyyy-MM-dd');
+        const ymd = Utilities.formatDate(recordingDate, tz, 'yyyy-MM-dd');
 
         // スケジュール判定
-        const scheduleInfo = getScheduleInfo(created, tz);
+        const scheduleInfo = getScheduleInfo(recordingDate, tz);
 
         // 新しいファイル名の決定
         let newBaseName;
@@ -85,7 +85,7 @@ function processSingleFile(file, tz) {
             // 必要であれば時限もファイル名に含める: `${ymd}_${scheduleInfo.subject}_${scheduleInfo.period}`
         } else {
             categoryName = '未分類';
-            const timeLabel = Utilities.formatDate(created, tz, 'HHmm');
+            const timeLabel = Utilities.formatDate(recordingDate, tz, 'HHmm');
             newBaseName = `${ymd}_未分類_${timeLabel}`;
         }
 
@@ -107,7 +107,7 @@ function processSingleFile(file, tz) {
         console.log(`Moved to: ${categoryName}`);
 
         // 3. スプレッドシートへ記録
-        logToSpreadsheet(file, categoryName, scheduleInfo, created, tz);
+        logToSpreadsheet(file, categoryName, scheduleInfo, recordingDate, tz);
 
     } catch (e) {
         console.error(`Error processing file ${file.getId()}: ${e.message}`);
@@ -135,6 +135,17 @@ function getScheduleInfo(date, tz) {
         }
     }
     return null;
+}
+
+/**
+ * 録音日時の推定
+ * Driveに一括アップロードされた場合は作成日時がアップロード時刻になるため、
+ * 作成日時と更新日時のうち古い方を採用する。
+ */
+function getRecordingDate(file) {
+    const created = file.getDateCreated();
+    const updated = file.getLastUpdated();
+    return created.getTime() <= updated.getTime() ? created : updated;
 }
 
 /**
