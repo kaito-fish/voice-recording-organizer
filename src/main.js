@@ -52,23 +52,78 @@ function processAudioFiles() {
     while (files.hasNext()) {
         const file = files.next();
         const currentName = file.getName();
+        const dateFromFileName = parseDateFromFilename(currentName);
 
-        // 既に処理済み（"YYYY-MM-DD_" 形式）の場合はスキップ
-        // ※正規表現は簡易的な判定です
-        if (/^\d{4}-\d{2}-\d{2}_/.test(currentName)) {
-            continue;
+        // ファイル名から日付が特定できた場合は、processed チェックをバイパスする
+        if (dateFromFileName) {
+            // Pass
+        } else {
+            // 上記形式以外で、既に処理済み（"YYYY-MM-DD_" 形式）の場合はスキップ
+            if (/^\d{4}-\d{2}-\d{2}_/.test(currentName)) {
+                continue;
+            }
         }
 
-        processSingleFile(file, tz);
+        processSingleFile(file, tz, dateFromFileName);
     }
+}
+
+/**
+ * ファイル名から日時を抽出する
+ * 対応フォーマット:
+ * 1. YYYY-MM-DD_HH-mm-ss (例: 2024-05-20_09-30-00)
+ * 2. YYYYMMDD_HHMMSS     (例: 20240520_093000)
+ * 3. YYYYMMDDHHMMSS      (例: 20240520093000)
+ */
+function parseDateFromFilename(filename) {
+    // Pattern 1: YYYY-MM-DD_HH-mm-ss
+    let match = filename.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})/);
+    if (match) {
+        return new Date(
+            parseInt(match[1], 10),
+            parseInt(match[2], 10) - 1,
+            parseInt(match[3], 10),
+            parseInt(match[4], 10),
+            parseInt(match[5], 10),
+            parseInt(match[6], 10)
+        );
+    }
+
+    // Pattern 2: YYYYMMDD_HHMMSS
+    match = filename.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+    if (match) {
+        return new Date(
+            parseInt(match[1], 10),
+            parseInt(match[2], 10) - 1,
+            parseInt(match[3], 10),
+            parseInt(match[4], 10),
+            parseInt(match[5], 10),
+            parseInt(match[6], 10)
+        );
+    }
+
+    // Pattern 3: YYYYMMDDHHMMSS (No separators)
+    match = filename.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);
+    if (match) {
+        return new Date(
+            parseInt(match[1], 10),
+            parseInt(match[2], 10) - 1,
+            parseInt(match[3], 10),
+            parseInt(match[4], 10),
+            parseInt(match[5], 10),
+            parseInt(match[6], 10)
+        );
+    }
+
+    return null;
 }
 
 /**
  * 個別のファイルを処理する
  */
-function processSingleFile(file, tz) {
+function processSingleFile(file, tz, dateFromFileName) {
     try {
-        const recordingDate = getRecordingDate(file);
+        const recordingDate = dateFromFileName || getRecordingDate(file);
         // 日付判定用に整形
         const ymd = Utilities.formatDate(recordingDate, tz, 'yyyy-MM-dd');
 
