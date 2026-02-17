@@ -14,7 +14,10 @@ const CONFIG = {
     // 録音管理用スプレッドシートのID
     SPREADSHEET_ID: 'YOUR_SPREADSHEET_ID',
     // スプレッドシートのシート名
-    SHEET_NAME: 'シート1'
+    SHEET_NAME: 'シート1',
+
+    // GoogleカレンダーID (例: 'primary' または 'x...x@group.calendar.google.com')
+    CALENDAR_ID: 'YOUR_CALENDAR_ID'
 };
 
 // スケジュール定義 (1:月, 2:火, 3:水, 4:木, 5:金, 6:土, 7:日)
@@ -177,6 +180,13 @@ function processSingleFile(file, tz, dateFromFileName) {
  * 作成日時からスケジュール情報を取得する
  */
 function getScheduleInfo(date, tz) {
+    // 1. Googleカレンダーから予定を取得 (優先)
+    const calendarEvent = getCalendarEvent(date, tz);
+    if (calendarEvent) {
+        return calendarEvent;
+    }
+
+    // 2. カレンダーになければ固定スケジュールを確認 (フォールバック)
     // Utilities.formatDate の 'u' は 1=Monday, ..., 7=Sunday
     const dayStr = Utilities.formatDate(date, tz, 'u');
     let dayNum = parseInt(dayStr, 10);
@@ -188,6 +198,49 @@ function getScheduleInfo(date, tz) {
         if (slot.start <= timeStr && timeStr < slot.end) {
             return slot; // {subject, period, start, end}
         }
+    }
+    return null;
+}
+
+/**
+ * Googleカレンダーから指定時刻のイベントを取得する
+ */
+function getCalendarEvent(date, tz) {
+    if (!CONFIG.CALENDAR_ID || CONFIG.CALENDAR_ID === 'YOUR_CALENDAR_ID') {
+        return null;
+    }
+
+    try {
+        const calendar = CalendarApp.getCalendarById(CONFIG.CALENDAR_ID);
+        if (!calendar) {
+            console.warn(`Calendar not found: ${CONFIG.CALENDAR_ID}`);
+            return null;
+        }
+
+        // dateの時点で開催中のイベントを取得
+        const events = calendar.getEventsForDay(date);
+
+        // 該当時刻を含むイベントを探す
+        const timeValue = date.getTime();
+
+        for (const event of events) {
+            // 終日イベントは除外したい場合: if (event.isAllDayEvent()) continue;
+
+            const start = event.getStartTime().getTime();
+            const end = event.getEndTime().getTime();
+
+            // 録音開始時刻がイベント期間内に含まれるか
+            if (start <= timeValue && timeValue < end) {
+                return {
+                    subject: event.getTitle(),
+                    period: 'Calendar', // 固定スケジュールのperiodの代わり
+                    start: Utilities.formatDate(event.getStartTime(), tz, 'HH:mm'),
+                    end: Utilities.formatDate(event.getEndTime(), tz, 'HH:mm')
+                };
+            }
+        }
+    } catch (e) {
+        console.error(`Error fetching calendar events: ${e.message}`);
     }
     return null;
 }
@@ -259,4 +312,26 @@ function logToSpreadsheet(file, categoryName, scheduleInfo, dateObj, tz) {
         transcriptStatus,
         transcriptFileId
     ]);
+}
+
+/**
+ * 検証用: カレンダー連携テスト
+ * GASエディタ上でこの関数を実行し、ログを確認してください。
+ */
+function testCalendarIntegration() {
+    // テスト用の日時 (現在日時など)
+    const testDate = new Date();
+    const tz = 'Asia/Tokyo';
+
+    console.log(`Testing calendar fetch for: ${testDate}`);
+    const result = getCalendarEvent(testDate, tz);
+
+    if (result) {
+        console.log('Event found:', result);
+    } else {
+        console.log('No event found for this time.');
+        if (CONFIG.CALENDAR_ID === 'YOUR_CALENDAR_ID') {
+            console.warn('CONFIG.CALENDAR_ID is not set.');
+        }
+    }
 }
