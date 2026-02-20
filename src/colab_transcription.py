@@ -71,6 +71,8 @@ def main():
         idx_file_url = -1
         idx_category = -1
         idx_date = -1
+        idx_file_id = -1
+        idx_file_name = -1
 
         for i, col_name in enumerate(header):
             if "ステータス" in col_name: idx_status = i
@@ -78,10 +80,16 @@ def main():
             if "URL" in col_name or "パス" in col_name: idx_file_url = i
             if "科目" in col_name or "カテゴリ" in col_name: idx_category = i
             if "日付" in col_name: idx_date = i
+            if col_name == "FileID" or "ファイルID" in col_name: idx_file_id = i
+            if "ファイル名" in col_name or col_name == "Name": idx_file_name = i
         
         # 必須カラムチェック
-        if idx_status == -1:
-            print("Error: 'Status' column not found.")
+        missing = []
+        if idx_status == -1: missing.append('ステータス')
+        if idx_file_id == -1: missing.append('FileID')
+        if idx_file_name == -1: missing.append('ファイル名')
+        if missing:
+            print(f"Error: Required column(s) not found: {', '.join(missing)}")
             return
 
     except ValueError:
@@ -118,9 +126,9 @@ def main():
             # google-api-python-client で ID からダウンロードして一時保存する方法が確実。
             # FileIDカラムがあると仮定 (MDによればある)
             
-            # 行データからFileIDを取得 (3列目 index 2 と想定)
-            file_id = row[2] 
-            file_name = row[1]
+            # 行データからFileIDとファイル名を取得 (ヘッダー名で検索済みのインデックスを使用)
+            file_id = row[idx_file_id]
+            file_name = row[idx_file_name]
             
             # Whisper実行
             transcript_text = run_transcription(model, file_id, file_name)
