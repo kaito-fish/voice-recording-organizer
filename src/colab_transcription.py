@@ -102,6 +102,9 @@ def main():
     print(f"Using device: {device}")
     model = whisper.load_model("medium", device=device) # base, small, medium, large
 
+    # バッチ更新用のリスト
+    updates = []
+
     for row_idx, row in enumerate(data):
         # 行番号は header(1) + row_idx + 1 (1-based for gspread) -> row_idx + 2
         actual_row_num = row_idx + 2
@@ -162,15 +165,23 @@ def main():
                     
                     print(f"Saved transcript to: {save_path}")
                     
-                    # 5. Update Spreadsheet
-                    # ステータス更新
-                    sheet.update_cell(actual_row_num, idx_status + 1, "完了")
-                    # ファイルID更新 (本当は新規作成したテキストファイルのIDを取得すべきだが、パスを入れる例とする)
+                    # 5. Update Spreadsheet (バッチ更新用にリストへ追加)
+                    status_cell = gspread.utils.rowcol_to_a1(actual_row_num, idx_status + 1)
+                    updates.append({'range': status_cell, 'values': [['完了']]})
                     if idx_ts_id != -1:
-                        sheet.update_cell(actual_row_num, idx_ts_id + 1, save_path)
+                        ts_cell = gspread.utils.rowcol_to_a1(actual_row_num, idx_ts_id + 1)
+                        updates.append({'range': ts_cell, 'values': [[save_path]]})
                         
                 except Exception as e:
                     print(f"Error saving/updating: {e}")
+
+    # 6. バッチ更新実行
+    if updates:
+        try:
+            sheet.batch_update(updates)
+            print(f"Spreadsheet updated: {len(updates)} cells")
+        except Exception as e:
+            print(f"Error in batch update: {e}")
 
 def run_transcription(model, file_id, file_name):
     print(f"Transcribing {file_name}...")
