@@ -4,6 +4,7 @@
 # !pip install gspread oauth2client google-api-python-client
 
 import os
+import torch
 import whisper
 import gspread
 from google.colab import auth
@@ -89,7 +90,9 @@ def main():
 
     # 4. Filter & Process
     # Whisperモデルのロード (初回はダウンロード走る)
-    model = whisper.load_model("medium") # base, small, medium, large
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+    model = whisper.load_model("medium", device=device) # base, small, medium, large
 
     for row_idx, row in enumerate(data):
         # 行番号は header(1) + row_idx + 1 (1-based for gspread) -> row_idx + 2

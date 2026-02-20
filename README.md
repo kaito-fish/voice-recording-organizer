@@ -14,6 +14,7 @@
 2.  **文字起こし (Google Colab + Whisper)**
     *   スプレッドシートの「未実行」データを読み込み
     *   OpenAI Whisper で高精度な文字起こしを実行（日本語対応）
+    *   **GPU (CUDA) 自動判定**: GPU が利用可能な場合は自動的に CUDA を使用し、高速に処理
     *   タイムスタンプ付きのテキストファイルとして保存（例: `[00:00:10] 音声の内容...`）
     *   スプレッドシートのステータスを「完了」に更新
 
@@ -96,8 +97,8 @@ Node.js 環境にて以下を実行します。
 3.  GAS エディタ上で、`processAudioFiles` 関数を **時間主導型トリガー**（例: 5分～1時間おき）に設定します。
 
 ### 3. Google Colab (文字起こし) の利用
-1.  Google Colab で新規ノートブックを作成します。
-2.  `src/colab_transcription.py` の内容をコードセルに貼り付けます。
+1.  Google Colab で `src/colab_transcription.ipynb` を開きます（または新規ノートブックに `src/colab_transcription.py` の内容を貼り付けます）。
+2.  **GPU ランタイムを有効化**します: メニューから `ランタイム` → `ランタイムのタイプを変更` → **GPU (T4)** を選択し保存します。
 3.  スクリプト冒頭の `SPREADSHEET_ID` を設定します。
 4.  必要なライブラリをインストールするため、以下のコマンドを別のセルで一度実行します。
     ```python
@@ -105,6 +106,8 @@ Node.js 環境にて以下を実行します。
     !pip install gspread oauth2client google-api-python-client
     ```
 5.  ノートブックを実行し、Google Drive のマウント許可を与えると、文字起こし処理が開始されます。
+    *   実行時に `Using device: cuda` と表示されれば GPU が正しく使用されています。
+    *   `Using device: cpu` と表示される場合は、手順2の GPU ランタイム設定を確認してください。
 
 ## 使い方 (Usage)
 
