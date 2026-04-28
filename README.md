@@ -7,7 +7,7 @@
 1.  **自動整理 (GAS)**
     *   アップロード用フォルダを定期監視
     *   ファイルの作成日時をもとに、**Googleカレンダーの予定** または **定例スケジュール定義** から「カテゴリ名（会議名・科目名など）」を特定
-    *   ファイルを `YYYY-MM-DD_カテゴリ名.m4a` 等にリネーム
+    *   ファイルを `YYYY-MM-DD_カテゴリ名_01.m4a` 等にリネーム（同一カテゴリ内で連番付与）
     *   カテゴリごとのフォルダへ自動移動（フォルダがない場合は自動作成）
     *   Google スプレッドシートへ台帳記録
 
@@ -23,7 +23,9 @@
 ```text
 .
 ├── src/
+│   ├── config.js                # 設定・スケジュール定数（CONFIG / SCHEDULE）
 │   ├── main.js                  # Google Apps Script (ファイル整理・台帳記録ロジック)
+│   ├── colab_transcription.ipynb # Google Colab用文字起こしノートブック
 │   └── colab_transcription.py   # Python Script (Google Colab用文字起こし)
 ├── appsscript.json              # GAS 設定ファイル
 └── README.md                    # 本ファイル
@@ -84,14 +86,14 @@ Node.js 環境にて以下を実行します。
 
 ### 2. Google Apps Script (GAS) の設定
 1.  このリポジトリを `clasp push` して GAS プロジェクトに反映します。
-2.  `src/main.js` の `CONFIG` 変数を編集し、自身の環境に合わせてIDを設定します。
+2.  `src/config.js` の `CONFIG` 変数を編集し、自身の環境に合わせてIDを設定します。
     ```javascript
     const CONFIG = {
-      UPLOAD_FOLDER_ID: '...',       // アップロード用フォルダID
-      CATEGORY_ROOT_FOLDER_ID: '...', // 保存用親フォルダID
-      SPREADSHEET_ID: '...',         // スプレッドシートID
+      UPLOAD_FOLDER_ID: '...',            // アップロード用フォルダID
+      CATEGORY_ROOT_FOLDER_ID: '...',     // 保存用親フォルダID
+      SPREADSHEET_ID: '...',              // スプレッドシートID
       SHEET_NAME: 'シート1',
-      CALENDAR_ID: 'primary'         // GoogleカレンダーID (例: 'primary' または '...group.calendar.google.com')
+      CALENDAR_ID: 'primary'              // GoogleカレンダーID (例: 'primary' または '...group.calendar.google.com')
     };
     ```
 3.  GAS エディタ上で、`processAudioFiles` 関数を **時間主導型トリガー**（例: 5分～1時間おき）に設定します。
@@ -130,10 +132,11 @@ Node.js 環境にて以下を実行します。
     *   `'primary'` を指定した場合は、**スクリプト実行ユーザー自身のメインカレンダー**が参照されます。
     *   特定の共有カレンダーなどを参照したい場合は、そのカレンダーID（`...group.calendar.google.com` 形式）を指定してください。
     *   録音日時と重なる予定がある場合、その予定タイトルがカテゴリ名になります。
-2.  **定例スケジュール** (`src/main.js` 内の `SCHEDULE` 定数)
+    *   **終日イベントは除外**されます（時刻指定のある予定のみが対象）。
+2.  **定例スケジュール** (`src/config.js` 内の `SCHEDULE` 定数)
     *   カレンダーに予定がない場合、曜日と時間帯に基づいて `SCHEDULE` 定数からカテゴリ名を決定します。
 
-### 定例スケジュールの設定 (`src/main.js`)
+### 定例スケジュールの設定 (`src/config.js`)
 
 *   `SCHEDULE` 定数を編集して、自身の定例スケジュールに合わせてください。
 *   `1` が月曜日、`2` が火曜日... `7` が日曜日です（GASの仕様に準拠）。
