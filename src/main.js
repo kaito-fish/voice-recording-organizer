@@ -8,24 +8,29 @@
  */
 function processAudioFiles() {
     const uploadFolder = DriveApp.getFolderById(CONFIG.UPLOAD_FOLDER_ID);
-    const files = uploadFolder.getFiles();
     const tz = 'Asia/Tokyo';
 
-    while (files.hasNext()) {
-        const file = files.next();
+    // 未処理ファイルを収集
+    const entries = [];
+    const iter = uploadFolder.getFiles();
+    while (iter.hasNext()) {
+        const file = iter.next();
         const currentName = file.getName();
         const dateFromFileName = parseDateFromFilename(currentName);
 
-        // ファイル名から日付が特定できた場合は、processed チェックをバイパスする
-        if (dateFromFileName) {
-            // Pass
-        } else {
-            // 上記形式以外で、既に処理済み（"YYYY-MM-DD_" 形式）の場合はスキップ
-            if (/^\d{4}-\d{2}-\d{2}_/.test(currentName)) {
-                continue;
-            }
+        if (!dateFromFileName && /^\d{4}-\d{2}-\d{2}_/.test(currentName)) {
+            continue; // 処理済みをスキップ
         }
 
+        // 録音日時を確定（ソートキーに使用）
+        const recordingDate = dateFromFileName || getRecordingDate(file);
+        entries.push({ file, dateFromFileName, recordingDate });
+    }
+
+    // 録音日時の昇順でソート
+    entries.sort((a, b) => a.recordingDate.getTime() - b.recordingDate.getTime());
+
+    for (const { file, dateFromFileName } of entries) {
         processSingleFile(file, tz, dateFromFileName);
     }
 }
@@ -112,18 +117,23 @@ function processSingleFile(file, tz, dateFromFileName) {
         if (dotIndex !== -1) {
             ext = file.getName().substring(dotIndex);
         }
-        const newName = newBaseName + ext;
 
-        // 1. リネーム
+        // 1. フォルダを先に取得（連番決定に使用）
+        const targetFolder = getOrCreateCategoryFolder(categoryName);
+
+        // 2. 同じ予定内の既存ファイルを確認して連番を決定
+        const num = getNextFileNumber(targetFolder, newBaseName, ext);
+        const newName = `${newBaseName}_${String(num).padStart(2, '0')}${ext}`;
+
+        // 3. リネーム
         file.setName(newName);
         console.log(`Renamed: ${newName}`);
 
-        // 2. フォルダ移動
-        const targetFolder = getOrCreateCategoryFolder(categoryName);
+        // 4. フォルダ移動
         file.moveTo(targetFolder);
         console.log(`Moved to: ${categoryName}`);
 
-        // 3. スプレッドシートへ記録
+        // 5. スプレッドシートへ記録
         logToSpreadsheet(file, categoryName, scheduleInfo, recordingDate, tz);
 
     } catch (e) {
@@ -213,6 +223,28 @@ function getRecordingDate(file) {
     const created = file.getDateCreated();
     const updated = file.getLastUpdated();
     return created.getTime() <= updated.getTime() ? created : updated;
+}
+
+/**
+ * 移動先フォルダ内の同一ベース名ファイルを確認し、次の連番を返す
+ * 例: baseName=2024-05-20_定例会議, ext=.m4a の場合
+ *   _01.m4a が存在すれば 2 を返す
+ *   何も存在しなければ 1 を返す
+ */
+function getNextFileNumber(folder, baseName, ext) {
+    let maxNum = 0;
+    const files = folder.getFiles();
+    const escapedBase = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedExt = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escapedBase}_(\\d+)${escapedExt}$`);
+
+    while (files.hasNext()) {
+        const match = files.next().getName().match(pattern);
+        if (match) {
+            maxNum = Math.max(maxNum, parseInt(match[1], 10));
+        }
+    }
+    return maxNum + 1;
 }
 
 /**
