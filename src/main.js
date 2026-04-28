@@ -193,7 +193,8 @@ function getCalendarEvent(date, tz) {
         const timeValue = date.getTime();
 
         for (const event of events) {
-            // 終日イベントは除外したい場合: if (event.isAllDayEvent()) continue;
+            // 終日イベントは除外
+            if (event.isAllDayEvent()) continue;
 
             const start = event.getStartTime().getTime();
             const end = event.getEndTime().getTime();
