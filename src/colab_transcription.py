@@ -104,6 +104,7 @@ def main():
 
     # バッチ更新用のリスト
     updates = []
+    BATCH_SIZE = 1  # 何件ごとにスプレッドシートを更新するか（1なら都度更新）
 
     for row_idx, row in enumerate(data):
         # 行番号は header(1) + row_idx + 1 (1-based for gspread) -> row_idx + 2
@@ -133,38 +134,32 @@ def main():
             file_id = row[idx_file_id]
             file_name = row[idx_file_name]
             
-            # Whisper実行
-            transcript_text = run_transcription(model, file_id, file_name)
+            # 運用上、カテゴリフォルダ名＝category変数なので（リネームロジックがそうなので）
+            # 以下でトライする。
+            save_path = f"/content/drive/MyDrive/録音_ARCHIVE/{category}/{date_str}_{category}_transcript.txt"
             
-            if transcript_text:
-                # 保存
-                # テキストファイルとして保存 (本来はDriveの正しいフォルダに戻すべき)
-                # ファイルIDから親フォルダがわかればいいが、ここは簡易的に
-                # 「同じフォルダに置く」ためにIDベースではなく、
-                # 処理用に一時パスに保存 -> Drive APIでアップロード or Driveマウントパス書き込み
+            # すでにファイルが存在する場合はWhisper実行をスキップ
+            if os.path.exists(save_path):
+                print(f"Transcript already exists, skipping Whisper: {save_path}")
+                transcript_text = None  # スキップ判定
+                is_success = True
+            else:
+                # Whisper実行
+                transcript_text = run_transcription(model, file_id, file_name)
+                is_success = transcript_text is not None
                 
-                # パス解決が面倒なので、単純にテキストファイルを作成して、
-                # upload codeを書くか、ローカル(Colab上)で完結させる。
-                # ここでは文字起こしテキストを作成し、テキストファイルの中身を表示するにとどめるか、
-                # Driveへ書き戻すロジック（パス指定）が必要。
-                
-                # 簡易実装: "/content/drive/MyDrive/録音_ARCHIVE/{category}/transcripts/" に集約保存する、など。
-                # フォルダ名が正確にわからないと失敗するため、ここでは安全にトップ直下などの固定パスか、
-                # ディレクトリ構造をあえて作らずに保存する例とする。もっとも確実なのはIDから親フォルダを取ること。
-                
-                # 運用上、カテゴリフォルダ名＝category変数なので（リネームロジックがそうなので）
-                # 以下でトライする。
-                save_path = f"/content/drive/MyDrive/録音_ARCHIVE/{category}/{date_str}_{category}_transcript.txt"
-                
+                if is_success:
+                    try:
+                        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                        with open(save_path, "w", encoding="utf-8") as f:
+                            f.write(transcript_text)
+                        print(f"Saved transcript to: {save_path}")
+                    except Exception as e:
+                        print(f"Error saving transcript: {e}")
+                        is_success = False
+
+            if is_success:
                 try:
-                    # 親切にディレクトリ作る
-                    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                    
-                    with open(save_path, "w", encoding="utf-8") as f:
-                        f.write(transcript_text)
-                    
-                    print(f"Saved transcript to: {save_path}")
-                    
                     # 5. Update Spreadsheet (バッチ更新用にリストへ追加)
                     status_cell = gspread.utils.rowcol_to_a1(actual_row_num, idx_status + 1)
                     updates.append({'range': status_cell, 'values': [['完了']]})
@@ -173,15 +168,25 @@ def main():
                         updates.append({'range': ts_cell, 'values': [[save_path]]})
                         
                 except Exception as e:
-                    print(f"Error saving/updating: {e}")
+                    print(f"Error updating list: {e}")
 
-    # 6. バッチ更新実行
+            # --- ここで一定件数ごとにスプレッドシートを更新 ---
+            # 完了ステータスの更新が1件でもあるか（cell数換算なので items数 > 0）
+            if len(updates) >= BATCH_SIZE * (2 if idx_ts_id != -1 else 1):
+                try:
+                    sheet.batch_update(updates)
+                    print(f"Spreadsheet updated (Batch): {len(updates)} cells")
+                    updates = [] # リセット
+                except Exception as e:
+                    print(f"Error in batch update during loop: {e}")
+
+    # 6. ループ終了後、残りのバッチ更新実行
     if updates:
         try:
             sheet.batch_update(updates)
-            print(f"Spreadsheet updated: {len(updates)} cells")
+            print(f"Spreadsheet updated (Final Batch): {len(updates)} cells")
         except Exception as e:
-            print(f"Error in batch update: {e}")
+            print(f"Error in final batch update: {e}")
 
 def run_transcription(model, file_id, file_name):
     print(f"Transcribing {file_name}...")
