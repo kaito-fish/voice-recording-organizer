@@ -17,3 +17,5 @@ Thumbs.db
 # Configs
 clasp.json
 .vscode/
+
+config.sample.js
