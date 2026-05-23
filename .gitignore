@@ -3,6 +3,9 @@
 .clasprc.json
 .clasprc
 
+# 実際のID・設定値を含む設定ファイル（config.sample.js をコピーして使用）
+src/config.js
+
 # プロジェクト設定ファイル
 .clasp.json
 
