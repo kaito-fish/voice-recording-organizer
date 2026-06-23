@@ -136,7 +136,10 @@ def main():
             
             # 運用上、カテゴリフォルダ名＝category変数なので（リネームロジックがそうなので）
             # 以下でトライする。
-            save_path = f"/content/drive/MyDrive/録音_ARCHIVE/{category}/{date_str}_{category}_transcript.txt"
+            # FileName（例: 2026-05-07_機械学習_01.m4a）から拡張子を除いた名前を使うことで、
+            # 同日・同カテゴリの複数録音（_01, _02, ...）でも文字起こしファイルが衝突しない。
+            file_base_name = os.path.splitext(file_name)[0]
+            save_path = f"/content/drive/MyDrive/録音_ARCHIVE/{category}/{file_base_name}_transcript.txt"
             
             # すでにファイルが存在する場合はWhisper実行をスキップ
             if os.path.exists(save_path):
