@@ -172,6 +172,13 @@ function getScheduleInfo(date, tz) {
 }
 
 /**
+ * フォルダ名・ファイル名として使えない記号を除去する
+ */
+function sanitizeCategoryName(name) {
+    return name.replace(/[\/\\:*?"<>|]/g, '_');
+}
+
+/**
  * Googleカレンダーから指定時刻のイベントを取得する
  */
 function getCalendarEvent(date, tz) {
@@ -202,7 +209,7 @@ function getCalendarEvent(date, tz) {
             // 録音開始時刻がイベント期間内に含まれるか
             if (start <= timeValue && timeValue < end) {
                 return {
-                    subject: event.getTitle(),
+                    subject: sanitizeCategoryName(event.getTitle()),
                     period: 'Calendar', // 固定スケジュールのperiodの代わり
                     start: Utilities.formatDate(event.getStartTime(), tz, 'HH:mm'),
                     end: Utilities.formatDate(event.getEndTime(), tz, 'HH:mm')
