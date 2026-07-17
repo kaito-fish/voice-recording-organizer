@@ -23,12 +23,16 @@
 ```text
 .
 ├── src/
-│   ├── config.js                # 設定・スケジュール定数（CONFIG / SCHEDULE）
+│   ├── config.sample.js         # 設定・スケジュール定数のテンプレート（CONFIG / SCHEDULE）
+│   ├── config.js                # config.sample.js をコピーして作成（gitignore対象・リポジトリには含まれない）
 │   ├── main.js                  # Google Apps Script (ファイル整理・台帳記録ロジック)
-│   └── colab_transcription.ipynb # Google Colab用文字起こしノートブック
-├── appsscript.json              # GAS 設定ファイル
+│   ├── colab_transcription.ipynb # Google Colab用文字起こしノートブック
+│   └── appsscript.json          # GAS 設定ファイル
+├── .claspignore                 # clasp push 対象外ファイルの定義
 └── README.md                    # 本ファイル
 ```
+
+※ `.clasp.json`（Script ID を保持する clasp の設定ファイル）も gitignore 対象のため、リポジトリには含まれません。後述の手順で各自作成します。
 
 ## 開発環境構築 (clasp)
 
@@ -45,14 +49,24 @@ Node.js 環境にて以下を実行します。
     ```
 
 ### 2. プロジェクトの紐付け
-*   **既存の GAS プロジェクトがある場合**:
-    ```bash
-    clasp clone <Script ID> --rootDir ./src
+*   **既存の GAS プロジェクトに紐付ける場合**:
+    リポジトリのルートに `.clasp.json` を手動で作成し、Script ID を設定します。
+
+    ```json
+    {
+      "scriptId": "<Script ID>",
+      "rootDir": "src"
+    }
     ```
+
+    その後 `clasp push` でローカルのコードを反映します（GAS 側の既存ファイルをローカルの内容で完全に置き換える場合は `clasp push -f`）。
+
+    > **注意**: `clasp clone` は使わないでください。`clasp clone` はリモート（GAS側）のファイルをダウンロードしてローカルに展開するコマンドのため、このリポジトリのファイルが上書きされたり、GAS 側の `コード.gs` などが混入したりします。また、`.clasp.json` が既にあるディレクトリでは実行自体がエラーになります。
 *   **新規作成する場合**:
     ```bash
     clasp create --title "VoiceOrganizer" --type standalone --rootDir ./src
     ```
+    （`.clasp.json` が自動生成されます）
 
 ### 3. 反映 (Push / Pull)
 *   ローカルの変更をアップロード: `clasp push`
@@ -62,11 +76,13 @@ Node.js 環境にて以下を実行します。
 
 ### 1. Google Drive & スプレッドシートの準備
 1.  **アップロード用フォルダ** を作成します（例: `録音_INBOX`）。
-2.  **保存用親フォルダ** を作成します（例: `録音_ARCHIVE`）。ここにカテゴリ別フォルダが作られます。
+2.  **保存用親フォルダ** をマイドライブ直下に `録音_ARCHIVE` という名前で作成します。ここにカテゴリ別フォルダが作られます。
+    *   ※ Colab の文字起こしノートブックは保存先パスを `マイドライブ/録音_ARCHIVE/<カテゴリ名>/` に固定で参照しているため、フォルダ名・場所を変える場合はノートブック側（`save_path`）の修正も必要です。
 3.  **管理用スプレッドシート** を作成します。
     *   シート名: `シート1`（デフォルト）
-    *   1行目に以下のヘッダーを作成することを推奨します（必須ではありませんが、視認性が向上します）。
+    *   1行目に以下のヘッダーを作成します。
         *   `ID`, `ファイル名`, `FileID`, `カテゴリ名`, `日付`, `曜日`, `開始時刻`, `URL`, `ステータス`, `文字起こしID`
+    *   GAS（整理・台帳記録）だけならヘッダーは無くても動作しますが、Colab の文字起こしノートブックはヘッダー名でカラムを特定するため、**文字起こしまで使う場合は必須**です（少なくとも `ファイル名` / `FileID` / `ステータス` が無いとエラーで停止します）。
 
 #### Google Drive フォルダ構成イメージ
 
@@ -84,7 +100,10 @@ Node.js 環境にて以下を実行します。
 ```
 
 ### 2. Google Apps Script (GAS) の設定
-1.  このリポジトリを `clasp push` して GAS プロジェクトに反映します。
+1.  `src/config.sample.js` をコピーして `src/config.js` を作成します（`config.js` は gitignore 対象のため、リポジトリには含まれていません）。
+    ```bash
+    cp src/config.sample.js src/config.js
+    ```
 2.  `src/config.js` の `CONFIG` 変数を編集し、自身の環境に合わせてIDを設定します。
     ```javascript
     const CONFIG = {
@@ -95,25 +114,22 @@ Node.js 環境にて以下を実行します。
       CALENDAR_ID: 'primary'              // GoogleカレンダーID (例: 'primary' または '...group.calendar.google.com')
     };
     ```
-3.  GAS エディタ上で、`processAudioFiles` 関数を **時間主導型トリガー**（例: 5分～1時間おき）に設定します。
+3.  `clasp push` でローカルのコードを GAS プロジェクトに反映します。
+4.  GAS エディタ上で、`processAudioFiles` 関数を **時間主導型トリガー**（例: 5分～1時間おき）に設定します。
 
 ### 3. Google Colab (文字起こし) の利用
 1.  Google Colab で `src/colab_transcription.ipynb` を開きます。
 2.  **GPU ランタイムを有効化**します: メニューから `ランタイム` → `ランタイムのタイプを変更` → **GPU (T4)** を選択し保存します。
-3.  スクリプト冒頭の `SPREADSHEET_ID` を設定します。
-4.  必要なライブラリをインストールするため、以下のコマンドを別のセルで一度実行します。
-    ```python
-    !pip install git+https://github.com/openai/whisper.git
-    !pip install gspread oauth2client google-api-python-client
-    ```
-5.  ノートブックを実行し、Google Drive のマウント許可を与えると、文字起こし処理が開始されます。
+3.  設定セルの `SPREADSHEET_ID` を設定します。
+4.  ノートブックを先頭のセルから順に実行します（先頭セルに必要なライブラリ・ffmpeg のインストールが含まれています）。Google Drive のマウント許可を与えると、文字起こし処理が開始されます。
     *   実行時に `Using device: cuda` と表示されれば GPU が正しく使用されています。
     *   `Using device: cpu` と表示される場合は、手順2の GPU ランタイム設定を確認してください。
 
 ## 使い方 (Usage)
 
-### 1. 自動実行
-セットアップ時に設定したトリガー（時間主導型）により、定期的にフォルダが監視され、自動で整理・文字起こしフローが実行されます。
+### 1. 自動実行（整理・台帳記録）
+セットアップ時に設定したトリガー（時間主導型）により、定期的にフォルダが監視され、リネーム・移動・台帳記録が自動で実行されます。
+※ 自動実行されるのはここまでです。文字起こしは Google Colab でノートブックを手動実行してください（台帳の「未実行」行がまとめて処理されます）。
 
 ### 2. 手動実行（すぐに整理したい場合）
 開発中やテスト、あるいはすぐに整理を実行したい場合は、以下の手順で手動実行できます。
