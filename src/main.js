@@ -10,17 +10,20 @@ function processAudioFiles() {
     const uploadFolder = DriveApp.getFolderById(CONFIG.UPLOAD_FOLDER_ID);
     const tz = 'Asia/Tokyo';
 
+    // 台帳に記録済みのFileID→カテゴリ名を取得（リネーム後に移動だけ失敗したファイルの救済に使う）
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+    const loggedFileCategories = getLoggedFileCategories(sheet);
+
     // 未処理ファイルを収集
+    // ファイル名が「処理済みっぽい」形式でもスキップしない: リネームは成功したが
+    // 移動や台帳記録が失敗して INBOX に残っているだけの可能性があるため、
+    // 実際に処理済みかどうかは台帳（loggedFileCategories）で判定する。
     const entries = [];
     const iter = uploadFolder.getFiles();
     while (iter.hasNext()) {
         const file = iter.next();
-        const currentName = file.getName();
-        const dateFromFileName = parseDateFromFilename(currentName);
-
-        if (!dateFromFileName && /^\d{4}-\d{2}-\d{2}_/.test(currentName)) {
-            continue; // 処理済みをスキップ
-        }
+        const dateFromFileName = parseDateFromFilename(file.getName());
 
         // 録音日時を確定（ソートキーに使用）
         const recordingDate = dateFromFileName || getRecordingDate(file);
@@ -31,8 +34,26 @@ function processAudioFiles() {
     entries.sort((a, b) => a.recordingDate.getTime() - b.recordingDate.getTime());
 
     for (const { file, dateFromFileName } of entries) {
-        processSingleFile(file, tz, dateFromFileName);
+        processSingleFile(file, tz, dateFromFileName, loggedFileCategories);
     }
+}
+
+/**
+ * 台帳（スプレッドシート）に記録済みの FileID とカテゴリ名の対応を取得する
+ */
+function getLoggedFileCategories(sheet) {
+    const map = new Map();
+    if (!sheet) return map;
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return map;
+
+    // カラム構成: A:レコードID, B:ファイル名, C:FileID, D:カテゴリ名, ...
+    const rows = sheet.getRange(2, 3, lastRow - 1, 2).getValues();
+    for (const [fileId, categoryName] of rows) {
+        if (fileId) map.set(fileId, categoryName);
+    }
+    return map;
 }
 
 /**
@@ -88,8 +109,19 @@ function parseDateFromFilename(filename) {
 /**
  * 個別のファイルを処理する
  */
-function processSingleFile(file, tz, dateFromFileName) {
+function processSingleFile(file, tz, dateFromFileName, loggedFileCategories) {
     try {
+        // 台帳に既に記録済み = リネームと記録は完了しているが、移動だけが失敗して
+        // INBOX に残っているケース。再度リネームや記録をやり直さず、移動だけ再試行する。
+        const loggedCategory = loggedFileCategories.get(file.getId());
+        if (loggedCategory !== undefined) {
+            console.warn(`Recovering stuck file (already logged, retrying move only): ${file.getName()} (${file.getId()})`);
+            const targetFolder = getOrCreateCategoryFolder(loggedCategory);
+            file.moveTo(targetFolder);
+            console.log(`Recovered move to: ${loggedCategory}`);
+            return;
+        }
+
         const recordingDate = dateFromFileName || getRecordingDate(file);
         // 日付判定用に整形
         const ymd = Utilities.formatDate(recordingDate, tz, 'yyyy-MM-dd');
@@ -129,12 +161,16 @@ function processSingleFile(file, tz, dateFromFileName) {
         file.setName(newName);
         console.log(`Renamed: ${newName}`);
 
-        // 4. フォルダ移動
+        // 4. スプレッドシートへ記録（移動より先に行う）
+        // ここで先に台帳へ記録しておくことで、この後の移動が失敗しても
+        // 次回実行時に loggedFileCategories 経由で移動だけを再試行でき、
+        // 「リネーム済みだが未記録・未移動のまま迷子になる」事態を防ぐ。
+        logToSpreadsheet(file, categoryName, scheduleInfo, recordingDate, tz);
+        console.log(`Logged to spreadsheet: ${newName}`);
+
+        // 5. フォルダ移動
         file.moveTo(targetFolder);
         console.log(`Moved to: ${categoryName}`);
-
-        // 5. スプレッドシートへ記録
-        logToSpreadsheet(file, categoryName, scheduleInfo, recordingDate, tz);
 
     } catch (e) {
         console.error(`Error processing file ${file.getId()}: ${e.message}`);
