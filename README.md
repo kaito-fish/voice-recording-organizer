@@ -25,8 +25,7 @@
 ├── src/
 │   ├── config.js                # 設定・スケジュール定数（CONFIG / SCHEDULE）
 │   ├── main.js                  # Google Apps Script (ファイル整理・台帳記録ロジック)
-│   ├── colab_transcription.ipynb # Google Colab用文字起こしノートブック
-│   └── colab_transcription.py   # Python Script (Google Colab用文字起こし)
+│   └── colab_transcription.ipynb # Google Colab用文字起こしノートブック
 ├── appsscript.json              # GAS 設定ファイル
 └── README.md                    # 本ファイル
 ```
@@ -99,7 +98,7 @@ Node.js 環境にて以下を実行します。
 3.  GAS エディタ上で、`processAudioFiles` 関数を **時間主導型トリガー**（例: 5分～1時間おき）に設定します。
 
 ### 3. Google Colab (文字起こし) の利用
-1.  Google Colab で `src/colab_transcription.ipynb` を開きます（または新規ノートブックに `src/colab_transcription.py` の内容を貼り付けます）。
+1.  Google Colab で `src/colab_transcription.ipynb` を開きます。
 2.  **GPU ランタイムを有効化**します: メニューから `ランタイム` → `ランタイムのタイプを変更` → **GPU (T4)** を選択し保存します。
 3.  スクリプト冒頭の `SPREADSHEET_ID` を設定します。
 4.  必要なライブラリをインストールするため、以下のコマンドを別のセルで一度実行します。
