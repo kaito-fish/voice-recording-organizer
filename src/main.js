@@ -63,46 +63,26 @@ function getLoggedFileCategories(sheet) {
  * 2. YYYYMMDD_HHMMSS     (例: 20240520_093000)
  * 3. YYYYMMDDHHMMSS      (例: 20240520093000)
  */
+const FILENAME_DATE_PATTERNS = [
+    /^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})/,
+    /^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/,
+    /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/,
+];
+
 function parseDateFromFilename(filename) {
-    // Pattern 1: YYYY-MM-DD_HH-mm-ss
-    let match = filename.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})/);
-    if (match) {
-        return new Date(
-            parseInt(match[1], 10),
-            parseInt(match[2], 10) - 1,
-            parseInt(match[3], 10),
-            parseInt(match[4], 10),
-            parseInt(match[5], 10),
-            parseInt(match[6], 10)
-        );
+    for (const pattern of FILENAME_DATE_PATTERNS) {
+        const match = filename.match(pattern);
+        if (match) {
+            return new Date(
+                parseInt(match[1], 10),
+                parseInt(match[2], 10) - 1,
+                parseInt(match[3], 10),
+                parseInt(match[4], 10),
+                parseInt(match[5], 10),
+                parseInt(match[6], 10)
+            );
+        }
     }
-
-    // Pattern 2: YYYYMMDD_HHMMSS
-    match = filename.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
-    if (match) {
-        return new Date(
-            parseInt(match[1], 10),
-            parseInt(match[2], 10) - 1,
-            parseInt(match[3], 10),
-            parseInt(match[4], 10),
-            parseInt(match[5], 10),
-            parseInt(match[6], 10)
-        );
-    }
-
-    // Pattern 3: YYYYMMDDHHMMSS (No separators)
-    match = filename.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);
-    if (match) {
-        return new Date(
-            parseInt(match[1], 10),
-            parseInt(match[2], 10) - 1,
-            parseInt(match[3], 10),
-            parseInt(match[4], 10),
-            parseInt(match[5], 10),
-            parseInt(match[6], 10)
-        );
-    }
-
     return null;
 }
 
