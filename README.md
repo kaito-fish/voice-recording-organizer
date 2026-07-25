@@ -28,7 +28,10 @@
 │   ├── main.js                  # Google Apps Script (ファイル整理・台帳記録ロジック)
 │   ├── colab_transcription.ipynb # Google Colab用文字起こしノートブック
 │   └── appsscript.json          # GAS 設定ファイル
+├── tests/
+│   └── main.test.js             # main.js の純粋関数に対する Jest テスト
 ├── .claspignore                 # clasp push 対象外ファイルの定義
+├── package.json                 # テスト用の依存関係定義（clasp push 対象外）
 └── README.md                    # 本ファイル
 ```
 
@@ -71,6 +74,17 @@ Node.js 環境にて以下を実行します。
 ### 3. 反映 (Push / Pull)
 *   ローカルの変更をアップロード: `clasp push`
 *   ブラウザ上の変更をダウンロード: `clasp pull`
+
+## テスト
+
+`main.js` 内の純粋関数（`parseDateFromFilename` / `getNextFileNumber`）は [Jest](https://jestjs.io/) でローカルテストできます。
+
+```bash
+npm install
+npm test
+```
+
+テストコードは `tests/` 配下に置きます（`rootDir: src` の clasp push 対象には含まれません）。
 
 ## セットアップ手順
 

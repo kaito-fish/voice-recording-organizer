@@ -329,6 +329,12 @@ function logToSpreadsheet(file, categoryName, scheduleInfo, dateObj, tz) {
     ]);
 }
 
+// Node.js (Jest) からのテスト用エクスポート。
+// GAS 実行環境には `module` が存在しないため、この行は無視される。
+if (typeof module !== 'undefined') {
+    module.exports = { parseDateFromFilename, getNextFileNumber };
+}
+
 /**
  * 検証用: カレンダー連携テスト
  * GASエディタ上でこの関数を実行し、ログを確認してください。

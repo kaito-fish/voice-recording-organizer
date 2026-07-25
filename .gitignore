@@ -9,6 +9,9 @@ src/config.js
 # プロジェクト設定ファイル
 .clasp.json
 
+# --- Node ---
+node_modules/
+
 # --- Python ---
 __pycache__/
 *.py[cod]
